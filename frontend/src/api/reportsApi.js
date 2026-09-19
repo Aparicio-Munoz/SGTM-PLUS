@@ -11,6 +11,11 @@ export const reportsApi = {
     return apiClient.get('/reports/orders', { params: { period } }).then((r) => r.data.data)
   },
 
+  // GET /reports/financial-history?limit=24 → resumen mensual calculado desde operaciones reales.
+  getFinancialHistory(limit = 24) {
+    return apiClient.get('/reports/financial-history', { params: { limit } }).then((r) => r.data.data)
+  },
+
   // GET /reports/top-parts?limit=10
   getTopParts(limit = 10) {
     return apiClient.get('/reports/top-parts', { params: { limit } }).then((r) => r.data.data)

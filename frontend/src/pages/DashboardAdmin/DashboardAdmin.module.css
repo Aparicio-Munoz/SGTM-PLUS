@@ -201,6 +201,14 @@
   gap: 16px;
 }
 
+.financialActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .financialTitle {
   margin: 0 0 4px;
   color: #0F172A;
@@ -224,6 +232,36 @@
   font-size: 0.72rem;
   font-weight: 700;
 }
+
+.historyButton {
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #FFFFFF;
+  color: #1E3A5F;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.historyButton:hover { border-color: #F97316; color: #C2410C; }
+
+.totalProfitCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 18px 20px;
+  border: 1px solid #99F6E4;
+  border-left: 4px solid #059669;
+  border-radius: 10px;
+  background: #FFFFFF;
+}
+
+.totalProfitCard span { color: #475569; font-size: 0.84rem; font-weight: 700; }
+.totalProfitCard strong { color: #047857; font-size: clamp(1.45rem, 3vw, 2rem); line-height: 1; }
+.totalProfitCard small { grid-column: 1 / -1; color: #64748B; font-size: 0.74rem; }
 
 .financialGrid {
   display: grid;
@@ -443,6 +481,76 @@
   text-align: center;
 }
 
+/* ── Historial financiero ─────────────────────────── */
+.historyBackdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.historyModal {
+  width: min(780px, 100%);
+  max-height: min(82vh, 720px);
+  overflow: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  background: #FFFFFF;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.historyModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.historyModalHeader h2 { margin: 0; color: #0F172A; font-size: 1.2rem; }
+.historyModalHeader p { margin: 5px 0 0; color: #64748B; font-size: 0.82rem; line-height: 1.45; }
+
+.closeHistoryButton {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: #F1F5F9;
+  color: #475569;
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeHistoryButton:hover { background: #FEE2E2; color: #B91C1C; }
+
+.historyList { display: grid; padding: 8px 22px 18px; }
+
+.historyRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, auto) minmax(140px, auto);
+  align-items: center;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.historyRow:last-child { border-bottom: 0; }
+.historyRow div { display: grid; gap: 3px; }
+.historyRow div:first-child strong { color: #0F172A; text-transform: capitalize; }
+.historyRow span { color: #64748B; font-size: 0.75rem; }
+.historyRow div:not(:first-child) { text-align: right; }
+.historyRow div:not(:first-child) strong { color: #1E293B; font-size: 0.9rem; }
+.historyRow .historyProfit strong { color: #047857; }
+
+.historyState, .historyError { margin: 0; padding: 36px 22px; color: #64748B; text-align: center; }
+.historyError { color: #B91C1C; }
+
 /* ── Responsive ──────────────────────────────────── */
 @media (max-width: 1200px) {
   .bottomGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -463,10 +571,18 @@
   .kpiGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .financialGrid { grid-template-columns: minmax(0, 1fr); }
   .financialHeader { flex-direction: column; }
+  .financialActions { justify-content: flex-start; }
+  .historyButton { width: 100%; }
+  .totalProfitCard { grid-template-columns: 1fr; gap: 6px; }
   .kpiValue { font-size: 1.2rem; }
   .kpiIcon { font-size: 1.3rem; }
   .header { flex-direction: column; }
   .headerActions { width: 100%; }
   .newOrderBtn { flex: 1; justify-content: center; }
   .chartWrap { height: 200px; }
+  .historyBackdrop { padding: 12px; }
+  .historyModalHeader { padding: 18px 16px 14px; }
+  .historyList { padding: 6px 16px 14px; }
+  .historyRow { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .historyRow div:first-child { grid-column: 1 / -1; }
 }

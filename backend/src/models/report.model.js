@@ -8,9 +8,9 @@ const QUICK_JOB_DAY = `DATE(CONVERT_TZ(q.created_at, '+00:00', '-05:00'))`
 // Las órdenes entregadas y los trabajos rápidos se unen aquí para que todos
 // los KPIs utilicen exactamente el mismo origen, fechas y fórmula.
 //
-// La utilidad es bruta: ventas - costo de repuestos - pago a técnicos. No se
-// descuenta nómina fija ni gastos operativos porque aún no se registran en la
-// base de datos.
+// La ganancia se calcula con los costos directos registrados: ventas - costo
+// de repuestos - comisión de técnicos. No se descuenta nómina fija ni gastos
+// operativos porque aún no se registran en la base de datos.
 const FINANCIAL_MOVEMENTS_CTE = `
   WITH part_costs AS (
     SELECT
@@ -26,7 +26,7 @@ const FINANCIAL_MOVEMENTS_CTE = `
       o.final_price AS order_revenue,
       0 AS quick_job_revenue,
       COALESCE(pc.parts_cost, 0) AS parts_cost,
-      o.labor_cost * COALESCE(o.technician_commission_percent, 0) / 100 AS technician_commissions,
+      o.final_price * COALESCE(o.technician_commission_percent, 0) / 100 AS technician_commissions,
       0 AS quick_job_payout,
       1 AS delivered_orders,
       0 AS quick_jobs,
@@ -47,11 +47,12 @@ const FINANCIAL_MOVEMENTS_CTE = `
       q.price AS quick_job_revenue,
       0 AS parts_cost,
       0 AS technician_commissions,
-      q.price AS quick_job_payout,
+      q.price * COALESCE(e.commission_percent, 0) / 100 AS quick_job_payout,
       0 AS delivered_orders,
       1 AS quick_jobs,
       0 AS has_estimated_cost
     FROM quick_jobs q
+    LEFT JOIN employees e ON e.id = q.employee_id
     WHERE q.deleted_at IS NULL
   )
 `
@@ -60,8 +61,8 @@ function pad2(value) {
   return String(value).padStart(2, '0')
 }
 
-function getBogotaPeriods() {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: BOGOTA_TIME_ZONE }).format(new Date())
+function getBogotaPeriods(now = new Date()) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: BOGOTA_TIME_ZONE }).format(now)
   const [year, month, day] = today.split('-').map(Number)
   const monthStart = `${year}-${pad2(month)}-01`
   const yearStart = `${year}-01-01`
@@ -74,8 +75,8 @@ function getBogotaPeriods() {
   return { today, year, month, monthStart, yearStart, fortnightStart, weekStart }
 }
 
-function getFinancialPeriodRange(period = 'monthly') {
-  const periods = getBogotaPeriods()
+export function getFinancialPeriodRange(period = 'monthly', now = new Date()) {
+  const periods = getBogotaPeriods(now)
   const fromByPeriod = {
     daily: periods.today,
     weekly: periods.weekStart,
@@ -90,7 +91,7 @@ function toNumber(value) {
   return Number(value ?? 0)
 }
 
-function formatFinancialTotals(row = {}) {
+export function formatFinancialTotals(row = {}) {
   const ordersRevenue = toNumber(row.orders_revenue)
   const quickJobsRevenue = toNumber(row.quick_jobs_revenue)
   const partsCost = toNumber(row.parts_cost)
@@ -107,7 +108,7 @@ function formatFinancialTotals(row = {}) {
     technicianCommissions,
     quickJobPayout,
     totalDirectCosts,
-    grossProfit: totalRevenue - totalDirectCosts,
+    profit: totalRevenue - totalDirectCosts,
     profitMargin: totalRevenue > 0 ? ((totalRevenue - totalDirectCosts) / totalRevenue) * 100 : 0,
     deliveredOrders: toNumber(row.delivered_orders),
     quickJobs: toNumber(row.quick_jobs),
@@ -136,14 +137,47 @@ async function getFinancialTotals(from, to) {
 
 export async function getFinancialSummary() {
   const { today, monthStart, yearStart, fortnightStart } = getBogotaPeriods()
-  const [todayTotals, fortnight, month, year] = await Promise.all([
+  const [todayTotals, fortnight, month, year, allTime] = await Promise.all([
     getFinancialTotals(today, today),
     getFinancialTotals(fortnightStart, today),
     getFinancialTotals(monthStart, today),
     getFinancialTotals(yearStart, today),
+    getFinancialTotals('1900-01-01', today),
   ])
 
-  return { today: todayTotals, fortnight, month, year }
+  return { today: todayTotals, fortnight, month, year, allTime }
+}
+
+export async function getFinancialHistory(limit = 24) {
+  const [rows] = await getPool().query(
+    `${FINANCIAL_MOVEMENTS_CTE}
+     SELECT
+       DATE_FORMAT(business_day, '%Y-%m') AS month,
+       COALESCE(SUM(order_revenue), 0) AS orders_revenue,
+       COALESCE(SUM(quick_job_revenue), 0) AS quick_jobs_revenue,
+       COALESCE(SUM(parts_cost), 0) AS parts_cost,
+       COALESCE(SUM(technician_commissions), 0) AS technician_commissions,
+       COALESCE(SUM(quick_job_payout), 0) AS quick_job_payout,
+       COALESCE(SUM(delivered_orders), 0) AS delivered_orders,
+       COALESCE(SUM(quick_jobs), 0) AS quick_jobs,
+       COALESCE(SUM(has_estimated_cost), 0) AS estimated_cost_records
+     FROM financial_movements
+     GROUP BY month
+     ORDER BY month DESC
+     LIMIT ?`,
+    [Number(limit)]
+  )
+
+  return rows.map((row) => {
+    const [year, month] = row.month.split('-').map(Number)
+    return {
+      month: row.month,
+      label: new Intl.DateTimeFormat('es-CO', {
+        month: 'long', year: 'numeric', timeZone: BOGOTA_TIME_ZONE,
+      }).format(new Date(Date.UTC(year, month - 1, 1, 5))),
+      ...formatFinancialTotals(row),
+    }
+  })
 }
 
 // ── KPIs del dashboard ────────────────────────────────────────
@@ -195,7 +229,7 @@ export async function getSummaryData() {
     motorcyclesInService: Number(inServiceRows[0].cnt),
     completedToday:       Number(completedRows[0].cnt),
     dailyRevenue:         financialToday.totalRevenue,
-    dailyGrossProfit:     financialToday.grossProfit,
+    dailyProfit:          financialToday.profit,
   }
 }
 
@@ -444,10 +478,10 @@ export async function getExecutiveKPIs() {
     yearlyRevenue:     financial.year.totalRevenue,
     dailyRevenue:      financial.today.totalRevenue,
     fortnightRevenue:  financial.fortnight.totalRevenue,
-    monthlyGrossProfit:   financial.month.grossProfit,
-    yearlyGrossProfit:    financial.year.grossProfit,
-    dailyGrossProfit:     financial.today.grossProfit,
-    fortnightGrossProfit: financial.fortnight.grossProfit,
+    monthlyProfit:        financial.month.profit,
+    yearlyProfit:         financial.year.profit,
+    dailyProfit:          financial.today.profit,
+    fortnightProfit:      financial.fortnight.profit,
     financial,
     lowStockItems:     Number(lowStockRow[0].cnt),
     ordersByStatus,
@@ -464,7 +498,7 @@ export async function getDashboardAlerts() {
   return { lowStock }
 }
 
-// ── Chart data: ventas y utilidad bruta mensuales ────────────
+// ── Chart data: ventas y ganancias mensuales ─────────────────
 export async function getMonthlyRevenue() {
   const { year, month: currentMonth, today, yearStart } = getBogotaPeriods()
   const [rows] = await getPool().query(
@@ -503,7 +537,7 @@ export async function getMonthlyRevenue() {
       // Aliases utilizados por las gráficas y exportaciones ya existentes.
       orders_count: toNumber(row?.delivered_orders),
       revenue: totals.totalRevenue,
-      gross_profit: totals.grossProfit,
+      profit: totals.profit,
     }
   })
 }
@@ -541,7 +575,7 @@ export async function getDailyRevenueThisMonth() {
       day_number: index + 1,
       ...totals,
       revenue: totals.totalRevenue,
-      gross_profit: totals.grossProfit,
+      profit: totals.profit,
     }
   })
 }
@@ -574,7 +608,7 @@ export async function getFortnightComparison() {
       ...totals,
       orders_count: totals.deliveredOrders,
       revenue: totals.totalRevenue,
-      gross_profit: totals.grossProfit,
+      profit: totals.profit,
     }
   })
 }

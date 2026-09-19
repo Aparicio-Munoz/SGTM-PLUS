@@ -3,6 +3,8 @@ import * as ReportModel from '../models/report.model.js'
 import * as AuditLogModel from '../models/auditLog.model.js'
 
 const VALID_PERIODS = ['daily', 'weekly', 'biweekly', 'monthly']
+const DEFAULT_FINANCIAL_HISTORY_LIMIT = 24
+const MAX_FINANCIAL_HISTORY_LIMIT = 60
 
 // ── Auditoría ─────────────────────────────────────────────────
 export async function getAuditLogs(query = {}) {
@@ -51,6 +53,14 @@ export async function getOrdersByPeriod(period = 'monthly') {
     )
   }
   return ReportModel.getOrdersByPeriod(period ?? 'monthly')
+}
+
+export async function getFinancialHistory(limit = DEFAULT_FINANCIAL_HISTORY_LIMIT) {
+  const parsedLimit = Number(limit)
+  if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > MAX_FINANCIAL_HISTORY_LIMIT) {
+    throw ApiError.badRequest(`limit debe ser un número entero entre 1 y ${MAX_FINANCIAL_HISTORY_LIMIT}`)
+  }
+  return ReportModel.getFinancialHistory(parsedLimit)
 }
 
 // ── Top repuestos ─────────────────────────────────────────────

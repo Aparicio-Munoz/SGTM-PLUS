@@ -16,6 +16,14 @@ export async function getOrdersByPeriod(req, res, next) {
   } catch (err) { next(err) }
 }
 
+export async function getFinancialHistory(req, res, next) {
+  try {
+    const { limit } = req.query
+    const data = await ReportService.getFinancialHistory(limit)
+    ApiResponse.success(res, data)
+  } catch (err) { next(err) }
+}
+
 export async function getTopParts(req, res, next) {
   try {
     const { limit = 10 } = req.query

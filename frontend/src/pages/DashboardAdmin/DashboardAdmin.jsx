@@ -56,6 +56,10 @@ export function DashboardAdmin() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [financialHistory, setFinancialHistory] = useState([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
   const mountedRef = useRef(true)
 
   const loadData = useCallback(async ({ showLoading } = {}) => {
@@ -70,6 +74,20 @@ export function DashboardAdmin() {
       if (mountedRef.current && showLoading) setLoading(false)
     }
   }, [])
+
+  async function openFinancialHistory() {
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const history = await reportsApi.getFinancialHistory()
+      if (mountedRef.current) setFinancialHistory(history)
+    } catch {
+      if (mountedRef.current) setHistoryError('No fue posible cargar el historial financiero.')
+    } finally {
+      if (mountedRef.current) setHistoryLoading(false)
+    }
+  }
 
   useEffect(() => {
     mountedRef.current = true
@@ -99,13 +117,13 @@ export function DashboardAdmin() {
       body: [
         ['Total clientes', k.totalClients], ['Total motos', k.totalMotorcycles],
         ['Órdenes activas', k.activeOrders], ['Órdenes entregadas', k.deliveredOrders],
-        ['Ventas del mes', fmtCOP(financial.month.totalRevenue)], ['Utilidad bruta del mes', fmtCOP(financial.month.grossProfit)],
+        ['Ventas del mes', fmtCOP(financial.month.totalRevenue)], ['Ganancias del mes', fmtCOP(financial.month.profit)],
         ['Órdenes entregadas del mes', fmtCOP(financial.month.ordersRevenue)], ['Trabajos rápidos del mes', fmtCOP(financial.month.quickJobsRevenue)],
-        ['Ventas del año', fmtCOP(financial.year.totalRevenue)], ['Utilidad bruta del año', fmtCOP(financial.year.grossProfit)],
+        ['Ventas del año', fmtCOP(financial.year.totalRevenue)], ['Ganancias del año', fmtCOP(financial.year.profit)],
         ['Órdenes entregadas del año', fmtCOP(financial.year.ordersRevenue)], ['Trabajos rápidos del año', fmtCOP(financial.year.quickJobsRevenue)],
-        ['Ventas de hoy', fmtCOP(financial.today.totalRevenue)], ['Utilidad bruta de hoy', fmtCOP(financial.today.grossProfit)],
+        ['Ventas de hoy', fmtCOP(financial.today.totalRevenue)], ['Ganancias de hoy', fmtCOP(financial.today.profit)],
         ['Órdenes entregadas de hoy', fmtCOP(financial.today.ordersRevenue)], ['Trabajos rápidos de hoy', fmtCOP(financial.today.quickJobsRevenue)],
-        ['Ventas de la quincena', fmtCOP(financial.fortnight.totalRevenue)], ['Utilidad bruta de la quincena', fmtCOP(financial.fortnight.grossProfit)],
+        ['Ventas de la quincena', fmtCOP(financial.fortnight.totalRevenue)], ['Ganancias de la quincena', fmtCOP(financial.fortnight.profit)],
         ['Órdenes entregadas de la quincena', fmtCOP(financial.fortnight.ordersRevenue)], ['Trabajos rápidos de la quincena', fmtCOP(financial.fortnight.quickJobsRevenue)],
         ['Stock bajo', k.lowStockItems],
       ],
@@ -124,19 +142,19 @@ export function DashboardAdmin() {
       { Métrica: 'Órdenes activas', Valor: k.activeOrders },
       { Métrica: 'Órdenes entregadas', Valor: k.deliveredOrders },
       { Métrica: 'Ventas del mes', Valor: financial.month.totalRevenue },
-      { Métrica: 'Utilidad bruta del mes', Valor: financial.month.grossProfit },
+      { Métrica: 'Ganancias del mes', Valor: financial.month.profit },
       { Métrica: 'Órdenes entregadas del mes', Valor: financial.month.ordersRevenue },
       { Métrica: 'Trabajos rápidos del mes', Valor: financial.month.quickJobsRevenue },
       { Métrica: 'Ventas del año', Valor: financial.year.totalRevenue },
-      { Métrica: 'Utilidad bruta del año', Valor: financial.year.grossProfit },
+      { Métrica: 'Ganancias del año', Valor: financial.year.profit },
       { Métrica: 'Órdenes entregadas del año', Valor: financial.year.ordersRevenue },
       { Métrica: 'Trabajos rápidos del año', Valor: financial.year.quickJobsRevenue },
       { Métrica: 'Ventas de hoy', Valor: financial.today.totalRevenue },
-      { Métrica: 'Utilidad bruta de hoy', Valor: financial.today.grossProfit },
+      { Métrica: 'Ganancias de hoy', Valor: financial.today.profit },
       { Métrica: 'Órdenes entregadas de hoy', Valor: financial.today.ordersRevenue },
       { Métrica: 'Trabajos rápidos de hoy', Valor: financial.today.quickJobsRevenue },
       { Métrica: 'Ventas de la quincena', Valor: financial.fortnight.totalRevenue },
-      { Métrica: 'Utilidad bruta de la quincena', Valor: financial.fortnight.grossProfit },
+      { Métrica: 'Ganancias de la quincena', Valor: financial.fortnight.profit },
       { Métrica: 'Órdenes entregadas de la quincena', Valor: financial.fortnight.ordersRevenue },
       { Métrica: 'Trabajos rápidos de la quincena', Valor: financial.fortnight.quickJobsRevenue },
       { Métrica: 'Stock bajo', Valor: k.lowStockItems },
@@ -172,8 +190,8 @@ export function DashboardAdmin() {
         borderColor: '#F97316', borderWidth: 2, borderRadius: 6,
       },
       {
-        label: 'Utilidad bruta',
-        data: ch.monthlyRevenue.map((r) => Number(r.gross_profit)),
+        label: 'Ganancias',
+        data: ch.monthlyRevenue.map((r) => Number(r.profit)),
         backgroundColor: 'rgba(5,150,105,0.3)',
         borderColor: '#059669', borderWidth: 2, borderRadius: 6,
       },
@@ -266,12 +284,20 @@ export function DashboardAdmin() {
             <div>
               <h2 id="financial-summary-title" className={styles.financialTitle}>Resumen financiero</h2>
               <p className={styles.financialDescription}>
-                Ventas: órdenes entregadas y trabajos rápidos. Utilidad bruta: ventas menos costo de repuestos y pagos a técnicos.
+                Ventas: órdenes entregadas y trabajos rápidos. Ganancias: ventas menos el costo de repuestos y la comisión de cada técnico.
               </p>
             </div>
-            {financialPeriods.some(({ key }) => financial[key].hasEstimatedCosts) ? (
-              <span className={styles.estimateBadge}>Histórico con costos estimados</span>
-            ) : null}
+            <div className={styles.financialActions}>
+              {financialPeriods.some(({ key }) => financial[key].hasEstimatedCosts) ? (
+                <span className={styles.estimateBadge}>Histórico con costos estimados</span>
+              ) : null}
+              <button type="button" className={styles.historyButton} onClick={openFinancialHistory}>Meses anteriores</button>
+            </div>
+          </div>
+          <div className={styles.totalProfitCard}>
+            <span>Ganancias totales</span>
+            <strong>{fmtCOP(financial.allTime.profit)}</strong>
+            <small>Histórico de órdenes entregadas y trabajos rápidos</small>
           </div>
           <div className={styles.financialGrid}>
             {financialPeriods.flatMap(({ key, label, icon }) => {
@@ -282,7 +308,7 @@ export function DashboardAdmin() {
                   detail: `Órdenes: ${fmtCOP(totals.ordersRevenue)} · Rápidos: ${fmtCOP(totals.quickJobsRevenue)}`,
                 },
                 {
-                  key: `${key}-profit`, label: `Utilidad bruta de ${label.toLowerCase()}`, value: totals.grossProfit, icon: '📈', color: '#059669',
+                  key: `${key}-profit`, label: `Ganancias de ${label.toLowerCase()}`, value: totals.profit, icon: '📈', color: '#059669',
                   detail: `Costos directos: ${fmtCOP(totals.totalDirectCosts)}`,
                 },
               ]
@@ -303,7 +329,7 @@ export function DashboardAdmin() {
       {/* Charts Grid */}
       <div className={styles.chartsGrid}>
         <div className={`${styles.chartCard} ${styles.chartWide}`}>
-          <h3 className={styles.chartTitle}>Ventas y utilidad bruta mensuales</h3>
+          <h3 className={styles.chartTitle}>Ventas y ganancias mensuales</h3>
           <div className={styles.chartWrap}>
             {revenueChart ? <Bar data={revenueChart} options={baseOpts} /> : <p className={styles.noData}>Sin datos</p>}
           </div>
@@ -387,6 +413,35 @@ export function DashboardAdmin() {
           </div>
         </div>
       </div>
+
+      {historyOpen ? (
+        <div className={styles.historyBackdrop} role="presentation" onMouseDown={() => setHistoryOpen(false)}>
+          <section className={styles.historyModal} role="dialog" aria-modal="true" aria-labelledby="financial-history-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className={styles.historyModalHeader}>
+              <div>
+                <h2 id="financial-history-title">Meses anteriores</h2>
+                <p>Ventas y ganancias calculadas desde órdenes entregadas y trabajos rápidos.</p>
+              </div>
+              <button type="button" className={styles.closeHistoryButton} onClick={() => setHistoryOpen(false)} aria-label="Cerrar historial">×</button>
+            </div>
+            {historyLoading ? <p className={styles.historyState}>Cargando historial…</p> : null}
+            {historyError ? <p className={styles.historyError}>{historyError}</p> : null}
+            {!historyLoading && !historyError ? (
+              financialHistory.length ? (
+                <div className={styles.historyList}>
+                  {financialHistory.map((month) => (
+                    <article key={month.month} className={styles.historyRow}>
+                      <div><strong>{month.label}</strong><span>{month.deliveredOrders} órdenes · {month.quickJobs} rápidos</span></div>
+                      <div><span>Ventas</span><strong>{fmtCOP(month.totalRevenue)}</strong></div>
+                      <div className={styles.historyProfit}><span>Ganancias</span><strong>{fmtCOP(month.profit)}</strong></div>
+                    </article>
+                  ))}
+                </div>
+              ) : <p className={styles.historyState}>Aún no hay operaciones con ganancia registrada.</p>
+            ) : null}
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }
